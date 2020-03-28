@@ -1,0 +1,199 @@
+---
+title: "COVID-19 Exploratory Analysis"
+author: "Brian Gulbis, PharmD, BCPS"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+    html_document:
+        code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Data
+
+```{r data}
+library(tidyverse)
+library(themebg)
+
+raw_train <- read_csv(
+    "../data/raw/covid19-global-forecasting-week-1/train.csv",
+    skip = 1,
+    col_names = c(
+        "id",
+        "state",
+        "country",
+        "lat",
+        "long",
+        "date",
+        "confirmed",
+        "fatalities"
+    )
+)
+
+raw_test <- read_csv(
+    "../data/raw/covid19-global-forecasting-week-1/test.csv",
+    skip = 1,
+    col_names = c(
+        "id",
+        "state",
+        "country",
+        "lat",
+        "long",
+        "date"
+    )
+)
+
+raw_countryinfo <- read_csv("../data/raw/countryinfo/covid19countryinfo.csv") %>%
+    mutate_at(
+        c("quarantine", "schools", "restrictions"),
+        parse_date,
+        format = "%m/%d/%Y"
+    )
+
+raw_weather <- read_csv("../data/raw/weather/training_data_with_weather_info_week_1.csv") 
+
+df_info <- raw_countryinfo %>%
+    filter(!is.na(pop))
+
+df_country_totals <- raw_train %>%
+    group_by(date, country) %>%
+    summarize_at(c("confirmed", "fatalities"), sum, na.rm = TRUE)
+
+df_day1 <- df_country_totals %>%
+    filter(confirmed != 0) %>%
+    group_by(country) %>%
+    mutate(day = difftime(date, min(date), units = "days")) %>%
+    mutate_at("day", as.numeric) %>%
+    mutate_at("day", list(~if_else(country == "China", . + 22, . + 1)))
+
+df_train <- df_country_totals %>%
+    left_join(df_day1) %>%
+    left_join(df_info, by = "country") %>%
+    mutate(
+        # pop_1mil = pop / 10000000,
+        confirm_percap = confirmed / pop,
+        confirm_1mil = confirmed / pop * 1000000,
+        fatal_percap = fatalities / pop,
+        fatal_1mil = fatalities / pop * 1000000
+    )
+
+df_train_day <- df_train %>%
+    filter(
+        !is.na(day),
+        pop >= 1000000
+    )
+
+df_curr <- df_train %>%
+    group_by(country) %>%
+    filter(
+        date == max(date),
+        pop >= 1000000
+    ) %>%
+    ungroup()
+
+df_top25_confirm <- df_curr %>%
+    top_n(25, confirmed)
+
+df_top25_confirm_percap <- df_curr %>%
+    top_n(25, confirm_percap)
+
+df_top25_confirm_1mil <- df_curr %>%
+    top_n(25, confirm_1mil)
+
+df_top25_fatal <- df_curr %>%
+    top_n(25, fatalities)
+
+df_top25_fatal_percap <- df_curr %>%
+    top_n(25, fatal_percap)
+
+df_top25_fatal_1mil <- df_curr %>%
+    top_n(25, fatal_1mil)
+
+df_global <- df_train %>%
+    group_by(date) %>%
+    summarize_at(c("confirmed", "fatalities"), sum, na.rm = TRUE)
+
+```
+
+# Exploratory Analysis
+
+```{r, fig.cap="Top 25 countries by confirmed cases"}
+df_top25_confirm %>%
+    arrange(desc(confirmed)) %>%
+    mutate_at("country", as_factor) %>%
+    mutate_at("country", fct_rev) %>%
+    ggplot(aes(x = country, y = confirmed)) +
+    geom_col() +
+    coord_flip() +
+    theme_bg()
+```
+
+```{r, fig.cap="Top 25 countries by confirmed cases per 1 million people"}
+df_top25_confirm_1mil %>%
+    arrange(desc(confirm_1mil)) %>%
+    mutate_at("country", as_factor) %>%
+    mutate_at("country", fct_rev) %>%
+    ggplot(aes(x = country, y = confirm_1mil)) +
+    geom_col() +
+    coord_flip() +
+    theme_bg()
+```
+
+```{r, fig.cap="Top 25 countries by fatalities"}
+df_top25_fatal %>%
+    arrange(desc(fatalities)) %>%
+    mutate_at("country", as_factor) %>%
+    mutate_at("country", fct_rev) %>%
+    ggplot(aes(x = country, y = fatalities)) +
+    geom_col() +
+    coord_flip() +
+    theme_bg()
+```
+
+```{r, fig.cap="Top 25 countries by fatalities per 1 million people"}
+df_top25_fatal_1mil %>%
+    arrange(desc(fatal_1mil)) %>%
+    mutate_at("country", as_factor) %>%
+    mutate_at("country", fct_rev) %>%
+    ggplot(aes(x = country, y = fatal_1mil)) +
+    geom_col() +
+    coord_flip() +
+    theme_bg()
+```
+
+```{r}
+df_train_day %>%
+    ggplot(aes(x = day, y = confirmed)) +
+    geom_line(aes(color = country)) +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r}
+df_train_day %>%
+    semi_join(df_top25_confirm, by = "country") %>%
+    ggplot(aes(x = day, y = confirmed)) +
+    geom_line(aes(color = country)) +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r}
+df_train_day %>%
+    semi_join(df_top25_confirm_1mil, by = "country") %>%
+    ggplot(aes(x = day, y = confirm_1mil)) +
+    geom_line(aes(color = country)) +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r}
+df_global %>%
+    pivot_longer(cols = c("confirmed", "fatalities")) %>%
+    ggplot(aes(x = date, y = value, color = name)) +
+    geom_line() + 
+    theme_bg()
+```
+

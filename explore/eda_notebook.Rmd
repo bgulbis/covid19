@@ -1,0 +1,229 @@
+---
+title: "COVID 19 Forecast"
+output: html_notebook
+---
+
+```{r setup}
+# library(plotly)
+library(tidyverse)
+```
+
+```{r data}
+raw_train <- read_csv(
+    "../data/raw/covid19-global-forecasting-week-1/train.csv",
+    skip = 1,
+    col_names = c(
+        "id",
+        "state",
+        "country",
+        "lat",
+        "long",
+        "date",
+        "confirmed",
+        "fatalities"
+    )
+)
+
+raw_test <- read_csv(
+    "../data/raw/covid19-global-forecasting-week-1/test.csv",
+    skip = 1,
+    col_names = c(
+        "id",
+        "state",
+        "country",
+        "lat",
+        "long",
+        "date"
+    )
+)
+
+raw_countryinfo <- read_csv("../data/raw/countryinfo/covid19countryinfo.csv") %>%
+    mutate_at(
+        c("quarantine", "schools", "restrictions"),
+        parse_date,
+        format = "%m/%d/%Y"
+    )
+
+df_info <- raw_countryinfo %>%
+    filter(!is.na(pop))
+
+df_country_totals <- raw_train %>%
+    group_by(date, country) %>%
+    summarize_at("confirmed", sum, na.rm = TRUE)
+
+df_day1 <- df_country_totals %>%
+    filter(confirmed != 0) %>%
+    group_by(country) %>%
+    mutate(day = difftime(date, min(date), units = "days")) %>%
+    mutate_at("day", as.numeric) %>%
+    mutate_at("day", list(~if_else(country == "China", . + 22, . + 1)))
+
+df_train <- df_country_totals %>%
+    left_join(df_day1, by = c("date", "country", "confirmed")) %>%
+    left_join(df_info, by = "country") 
+
+```
+
+
+# Exploratory Analysis
+
+```{r}
+summary(raw_train)
+```
+
+```{r}
+summary(raw_test)
+```
+
+
+```{r}
+length(unique(raw_train$country))
+```
+
+```{r}
+length(unique(raw_train$state))
+```
+
+```{r}
+distinct(raw_train, country)
+```
+
+```{r}
+raw_train %>%
+    filter(country == "Italy") %>%
+    ggplot(aes(x = date, y = confirmed)) +
+    geom_col()
+```
+
+```{r}
+raw_train %>%
+    filter(country == "Italy") %>%
+    ggplot(aes(x = date, y = fatalities)) +
+    geom_col()
+```
+
+```{r}
+raw_train %>%
+    filter(country == "US") %>%
+    ggplot(aes(x = date, y = confirmed)) +
+    geom_col()
+```
+
+```{r}
+raw_train %>%
+    filter(country == "US") %>%
+    ggplot(aes(x = date, y = fatalities)) +
+    geom_col()
+```
+
+```{r}
+raw_train %>%
+    filter(country == "US") %>%
+    group_by(date) %>%
+    summarize_at(c("confirmed", "fatalities"), sum, na.rm = 0)
+```
+
+```{r}
+raw_train %>%
+    # filter(country == "US") %>%
+    ggplot(aes(x = date, y = confirmed)) +
+    geom_col()
+```
+
+```{r}
+raw_train %>%
+    # filter(country == "US") %>%
+    ggplot(aes(x = date, y = fatalities)) +
+    geom_col()
+```
+
+```{r}
+df_us <- filter(raw_train, country == "US")
+```
+
+```{r}
+raw_train %>%
+    mutate(USA = country == "US") %>%
+    # mutate_at("USA", list(~if_else(., "USA", "Other"))) %>%
+    ggplot(aes(x = date, y = confirmed)) +
+    geom_col() 
+```
+```{r}
+df_groups <- raw_train %>%
+    mutate(groups = as_factor(country)) %>%
+    mutate_at("groups", fct_other, keep = c("US", "China", "Italy")) 
+```
+
+```{r}
+df_groups %>%
+    ggplot(aes(x = date, y = confirmed)) +
+    geom_col(aes(fill = groups)) +
+    scale_fill_brewer(palette = "Set1")
+```
+
+```{r}
+df_groups %>%
+    group_by(date, groups) %>%
+    summarize_at("confirmed", sum, na.rm = TRUE) %>%
+    ggplot(aes(x = date, y = confirmed)) +
+    geom_line(aes(color = groups)) 
+```
+
+```{r}
+df_day1 <- df_us %>%
+    filter(confirmed != 0) %>%
+    group_by(state) %>%
+    mutate(day = difftime(date, min(date), units = "days")) %>%
+    mutate_at("day", as.numeric)
+```
+
+```{r}
+df_day1 %>%
+    ggplot(aes(x = day, y = confirmed)) +
+    geom_line(aes(color = state)) +
+    theme(legend.position = "none")
+```
+
+```{r}
+df_filter <- raw_train %>%
+    filter(date == max(date)) %>%
+    group_by(date, country) %>%
+    summarize_at("confirmed", sum, na.rm = TRUE) %>%
+    top_n(25, confirmed)
+```
+
+
+```{r}
+df_day1_world <- raw_train %>%
+    group_by(date, country) %>%
+    summarize_at("confirmed", sum, na.rm = TRUE) %>%    
+    filter(confirmed != 0) %>%
+    group_by(country) %>%
+    mutate(day = difftime(date, min(date), units = "days")) %>%
+    mutate_at("day", as.numeric) 
+    # mutate_at("day", list(~if_else(country == "China", . + 22, .)))
+```
+
+```{r}
+df_day1_world %>%
+    semi_join(df_filter, by = "Country/Region") %>%
+    ggplot(aes(x = day, y = confirmed)) +
+    geom_line(aes(color = country)) +
+    scale_x_continuous(breaks = seq(0, 70, 7)) +
+    theme(legend.position = "none")
+```
+
+```{r}
+df_day1_world %>%
+    semi_join(df_filter, by = "Country/Region") %>%
+    filter(country != "China") %>%
+    ggplot(aes(x = day, y = confirmed)) +
+    geom_line(aes(color = country)) +
+    scale_x_continuous(breaks = seq(0, 70, 7)) +
+    theme(legend.position = "none")
+```
+
+```{r}
+
+```
+

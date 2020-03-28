@@ -1,0 +1,129 @@
+---
+title: "COVID-19 Tracking Data"
+author: "Brian Gulbis, PharmD, BCPS"
+date: "3/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Data source: www.covidtracking.com
+
+```{r}
+library(tidyverse)
+library(themebg)
+
+raw_state <- read_csv("../data/raw/covidtracking/states-daily.csv") %>%
+    mutate_at("date", as.character) %>%
+    mutate_at("date", parse_date, format = "%Y%m%d") %>%
+    arrange(date, state)
+
+raw_state_info <- read_csv("../data/raw/covidtracking/states-info.csv")
+
+raw_usa <- read_csv("../data/raw/covidtracking/us-daily.csv")
+
+```
+
+```{r}
+raw_state %>%
+    ggplot(aes(x = date, y = positive, color = state)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r}
+raw_state %>%
+    ggplot(aes(x = date, y = negative, color = state)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r}
+raw_state %>%
+    ggplot(aes(x = date, y = totalTestResults, color = state)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r}
+raw_state %>%
+    filter(!is.na(death)) %>%
+    ggplot(aes(x = date, y = death, color = state)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r}
+df_us_ny <- raw_state %>%
+    mutate(is_ny = state == "NY") %>%
+    group_by(date, is_ny) %>%
+    summarize_at(c("positive", "negative", "death"), sum, na.rm = TRUE) %>%
+    mutate(tests = positive + negative) %>%
+    group_by(is_ny) %>%
+    mutate(
+        positive_change = positive - lag(positive),
+        negative_change = negative - lag(negative),
+        death_change = death - lag(death),
+        tests_change = tests - lag(tests),
+        death_positive = death / positive
+    )
+```
+
+```{r}
+df_us_ny %>%
+    ggplot(aes(x = date, y = positive, color = is_ny)) +
+    geom_line() +
+    theme_bg()
+```
+
+```{r}
+df_us_ny %>%
+    ggplot(aes(x = date, y = negative, color = is_ny)) +
+    geom_line() +
+    theme_bg()
+```
+
+```{r}
+df_us_ny %>%
+    ggplot(aes(x = date, y = tests, color = is_ny)) +
+    geom_line() +
+    theme_bg()
+```
+
+```{r}
+df_us_ny %>%
+    ggplot(aes(x = date, y = death, color = is_ny)) +
+    geom_line() +
+    theme_bg()
+```
+
+```{r}
+df_us_ny %>%
+    ggplot(aes(x = date, y = positive_change, color = is_ny)) +
+    geom_smooth() +
+    geom_point() +
+    theme_bg()
+```
+
+```{r}
+df_us_ny %>%
+    ggplot(aes(x = date, y = death_change, color = is_ny)) +
+    geom_smooth() +
+    geom_point() +
+    theme_bg()
+```
+
+```{r}
+df_us_ny %>%
+    filter(death_positive > 0) %>%
+    ggplot(aes(x = date, y = death_positive, color = is_ny)) +
+    geom_line() +
+    theme_bg()
+```
+
