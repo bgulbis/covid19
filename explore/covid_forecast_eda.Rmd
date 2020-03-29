@@ -17,15 +17,15 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(themebg)
 
+# raw_train <- read_csv("../data/raw/covid19-global-forecasting-week-2/train.csv")
+
 raw_train <- read_csv(
-    "../data/raw/covid19-global-forecasting-week-1/train.csv",
+    "../data/raw/covid19-global-forecasting-week-2/train.csv",
     skip = 1,
     col_names = c(
         "id",
         "state",
         "country",
-        "lat",
-        "long",
         "date",
         "confirmed",
         "fatalities"
@@ -33,14 +33,12 @@ raw_train <- read_csv(
 )
 
 raw_test <- read_csv(
-    "../data/raw/covid19-global-forecasting-week-1/test.csv",
+    "../data/raw/covid19-global-forecasting-week-2/test.csv",
     skip = 1,
     col_names = c(
         "id",
         "state",
         "country",
-        "lat",
-        "long",
         "date"
     )
 )
@@ -52,7 +50,7 @@ raw_countryinfo <- read_csv("../data/raw/countryinfo/covid19countryinfo.csv") %>
         format = "%m/%d/%Y"
     )
 
-raw_weather <- read_csv("../data/raw/weather/training_data_with_weather_info_week_1.csv") 
+raw_weather <- read_csv("../data/raw/weather/training_data_with_weather_info_week_2.csv") 
 
 df_info <- raw_countryinfo %>%
     filter(!is.na(pop))
@@ -76,7 +74,13 @@ df_train <- df_country_totals %>%
         confirm_percap = confirmed / pop,
         confirm_1mil = confirmed / pop * 1000000,
         fatal_percap = fatalities / pop,
-        fatal_1mil = fatalities / pop * 1000000
+        fatal_1mil = fatalities / pop * 1000000,
+    ) %>%
+    group_by(country) %>%
+    mutate(
+        confirm_new = confirmed - lag(confirmed),
+        fatal_new = fatalities - lag(fatalities)
+        # quarantine_day = difftime(quarantine, date, units = "days")
     )
 
 df_train_day <- df_train %>%
@@ -115,6 +119,8 @@ df_global <- df_train %>%
     group_by(date) %>%
     summarize_at(c("confirmed", "fatalities"), sum, na.rm = TRUE)
 
+df_region <- raw_train %>%
+    mutate(region = if_else(!is.na(state), state, country)) 
 ```
 
 # Exploratory Analysis
@@ -197,3 +203,41 @@ df_global %>%
     theme_bg()
 ```
 
+```{r}
+df_train_reg <- df_train %>%
+    filter(!is.na(day)) %>%
+    ungroup() %>%
+    mutate_at("country", factor) %>%
+    mutate_at("country", list(~fct_relevel(., "China", after = 0L))) %>%
+    mutate(
+        confirm_ln = log(confirmed),
+        confirm_1mil_ln = log(confirm_1mil)
+    )
+
+mod <- lm(confirm_1mil ~ day + pop + density + medianage + urbanpop + hospibed + smokers, data = df_train_reg)
+
+summary(mod)
+```
+
+```{r}
+mod <- lm(confirm_1mil_ln ~ medianage, data = df_train_reg) 
+
+summary(mod)
+```
+
+
+```{r}
+df_top25_reg <- df_top25_confirm %>%
+    filter(!is.na(day)) %>%
+    ungroup() %>%
+    mutate_at("country", factor) %>%
+    mutate_at("country", list(~fct_relevel(., "China", after = 0L))) %>%
+    mutate(
+        confirm_ln = log(confirmed),
+        confirm_1mil_ln = log(confirm_1mil)
+    )
+
+mod <- lm(confirm_1mil_ln ~ day + pop + density + medianage + urbanpop + hospibed + smokers, data = df_top25_reg)
+
+summary(mod)
+```
