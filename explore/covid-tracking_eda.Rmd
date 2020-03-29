@@ -17,18 +17,54 @@ Data source: www.covidtracking.com
 library(tidyverse)
 library(themebg)
 
-raw_state <- read_csv("../data/raw/covidtracking/states-daily.csv") %>%
+raw_state <- read_csv("https://covidtracking.com/api/states/daily.csv") %>%
     mutate_at("date", as.character) %>%
     mutate_at("date", parse_date, format = "%Y%m%d") %>%
     arrange(date, state)
 
-raw_state_info <- read_csv("../data/raw/covidtracking/states-info.csv")
+raw_state_info <- read_csv("https://covidtracking.com/api/states/info.csv")
 
-raw_usa <- read_csv("../data/raw/covidtracking/us-daily.csv")
+raw_usa <- read_csv("https://covidtracking.com/api/us/daily.csv") %>%
+    mutate_at("date", as.character) %>%
+    mutate_at("date", parse_date, format = "%Y%m%d") 
 
 ```
 
-```{r}
+# USA
+
+```{r, fig.cap="Positive cases in USA"}
+raw_usa %>%
+    ggplot(aes(x = date, y = positive)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r, fig.cap="Number of of new positive cases each day in USA"}
+raw_usa %>%
+    ggplot(aes(x = date, y = positiveIncrease)) +
+    geom_line() +
+    theme_bg()
+```
+
+```{r, fig.cap="Cummulative deaths in USA"}
+raw_usa %>%
+    ggplot(aes(x = date, y = death)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r, fig.cap="Number of new deaths each day in USA"}
+raw_usa %>%
+    ggplot(aes(x = date, y = deathIncrease)) +
+    geom_line() +
+    theme_bg()
+```
+
+# State
+
+```{r, fig.cap="Positive cases by state"}
 raw_state %>%
     ggplot(aes(x = date, y = positive, color = state)) +
     geom_line() +
@@ -36,7 +72,7 @@ raw_state %>%
     theme(legend.position = "none")
 ```
 
-```{r}
+```{r, fig.cap="Negative tests by state"}
 raw_state %>%
     ggplot(aes(x = date, y = negative, color = state)) +
     geom_line() +
@@ -44,7 +80,7 @@ raw_state %>%
     theme(legend.position = "none")
 ```
 
-```{r}
+```{r, fig.cap="Total number of tests by state"}
 raw_state %>%
     ggplot(aes(x = date, y = totalTestResults, color = state)) +
     geom_line() +
@@ -52,7 +88,7 @@ raw_state %>%
     theme(legend.position = "none")
 ```
 
-```{r}
+```{r, fig.cap="Number of deaths by state"}
 raw_state %>%
     filter(!is.na(death)) %>%
     ggplot(aes(x = date, y = death, color = state)) +
@@ -60,6 +96,24 @@ raw_state %>%
     theme_bg() +
     theme(legend.position = "none")
 ```
+
+```{r, fig.cap="Number of new positive cases each day by state"}
+raw_state %>%
+    ggplot(aes(x = date, y = positiveIncrease, color = state)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r, fig.cap="Number of new deaths each day by state"}
+raw_state %>%
+    ggplot(aes(x = date, y = deathIncrease, color = state)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+# NY vs. Rest of USA
 
 ```{r}
 df_us_ny <- raw_state %>%
@@ -77,35 +131,35 @@ df_us_ny <- raw_state %>%
     )
 ```
 
-```{r}
+```{r, fig.cap="Number of positive cases in NY vs. rest of USA"}
 df_us_ny %>%
     ggplot(aes(x = date, y = positive, color = is_ny)) +
     geom_line() +
     theme_bg()
 ```
 
-```{r}
+```{r, fig.cap="Number of negative tests in NY vs. rest of USA"}
 df_us_ny %>%
     ggplot(aes(x = date, y = negative, color = is_ny)) +
     geom_line() +
     theme_bg()
 ```
 
-```{r}
+```{r, fig.cap="Number of tests performed in NY vs. rest of USA"}
 df_us_ny %>%
     ggplot(aes(x = date, y = tests, color = is_ny)) +
     geom_line() +
     theme_bg()
 ```
 
-```{r}
+```{r, fig.cap="Number of deaths in NY vs. rest of USA"}
 df_us_ny %>%
     ggplot(aes(x = date, y = death, color = is_ny)) +
     geom_line() +
     theme_bg()
 ```
 
-```{r}
+```{r, fig.cap="Number of of new positive cases each day in NY vs. rest of USA"}
 df_us_ny %>%
     ggplot(aes(x = date, y = positive_change, color = is_ny)) +
     geom_smooth() +
@@ -113,7 +167,7 @@ df_us_ny %>%
     theme_bg()
 ```
 
-```{r}
+```{r, fig.cap="Number of new deaths each day in NY vs. rest of USA"}
 df_us_ny %>%
     ggplot(aes(x = date, y = death_change, color = is_ny)) +
     geom_smooth() +
@@ -121,7 +175,7 @@ df_us_ny %>%
     theme_bg()
 ```
 
-```{r}
+```{r, fig.cap="Number of deaths per positive cases in NY vs. rest of USA"}
 df_us_ny %>%
     filter(death_positive > 0) %>%
     ggplot(aes(x = date, y = death_positive, color = is_ny)) +
