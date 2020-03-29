@@ -45,15 +45,20 @@ raw_test <- read_csv(
 
 raw_countryinfo <- read_csv("../data/raw/countryinfo/covid19countryinfo.csv") %>%
     mutate_at(
-        c("quarantine", "schools", "restrictions"),
+        c("quarantine", "schools", "publicplace", "gathering", "nonessential"),
         parse_date,
         format = "%m/%d/%Y"
     )
 
+raw_restrictions <- read_csv("../data/raw/countryinfo/restrictions.csv")
+
 raw_weather <- read_csv("../data/raw/weather/training_data_with_weather_info_week_2.csv") 
 
 df_info <- raw_countryinfo %>%
-    filter(!is.na(pop))
+    filter(
+        !is.na(pop),
+        is.na(region)
+    )
 
 df_country_totals <- raw_train %>%
     group_by(date, country) %>%
@@ -122,6 +127,11 @@ df_global <- df_train %>%
 df_region <- raw_train %>%
     mutate(region = if_else(!is.na(state), state, country)) 
 ```
+
+```{r}
+df_us <- filter(raw_train, country == "US")
+```
+
 
 # Exploratory Analysis
 
