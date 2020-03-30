@@ -17,7 +17,20 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(themebg)
 
-# raw_train <- read_csv("../data/raw/covid19-global-forecasting-week-2/train.csv")
+raw_week1 <- read_csv(
+    "../data/raw/covid19-global-forecasting-week-1/train.csv",
+    skip = 1,
+    col_names = c(
+        "id",
+        "state",
+        "country",
+        "lat",
+        "long",
+        "date",
+        "confirmed",
+        "fatalities"
+    )
+)
 
 raw_train <- read_csv(
     "../data/raw/covid19-global-forecasting-week-2/train.csv",
