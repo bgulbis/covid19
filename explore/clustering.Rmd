@@ -1,0 +1,141 @@
+---
+title: "Clustering"
+author: "Brian Gulbis, PharmD, BCPS"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+    html_document:
+        code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+raw_weather <- read_csv("../data/raw/weather/training_data_with_weather_info_week_2.csv") 
+
+df_weather_mar1 <- raw_weather %>%
+    filter(Date == mdy("03-01-2020")) %>%
+    group_by(Country_Region) %>%
+    summarize_at(
+        c(
+            "temp",
+            "min",
+            "max",
+            "wdsp",
+            "prcp"
+        ),
+        median,
+        na.rm = TRUE
+    ) %>%
+    rename(country = Country_Region)
+
+summary(df_weather_mar1)
+```
+
+```{r}
+raw_countryinfo <- read_csv("../data/raw/countryinfo/covid19countryinfo.csv") %>%
+    mutate_at(
+        c("quarantine", "schools", "publicplace", "gathering", "nonessential"),
+        parse_date,
+        format = "%m/%d/%Y"
+    )
+
+df_info <- raw_countryinfo %>%
+    filter(
+        !is.na(pop),
+        is.na(region),
+        !is.na(gdp2019)
+    ) 
+
+summary(df_info)
+```
+
+```{r}
+df_info %>%
+    filter(is.na(smokers))
+```
+
+
+```{r}
+df_scale <- df_info %>%
+    inner_join(df_weather_mar1, by = "country") %>%
+    select(
+        country,
+        pop,
+        density,
+        medianage,
+        urbanpop,
+        hospibed,
+        # smokers,
+        gdp2019,
+        # healthexp,
+        # healthperpop,
+        fertility,
+        temp,
+        min,
+        max,
+        wdsp,
+        prcp
+    ) %>%
+    column_to_rownames("country") %>%
+    scale()
+
+# c2 <- kmeans(df_scale, centers = 2, nstart = 30)
+# c3 <- kmeans(df_scale, centers = 3, nstart = 30)
+# c4 <- kmeans(df_scale, centers = 4, nstart = 30)
+# c5 <- kmeans(df_scale, centers = 5, nstart = 30)
+# c6 <- kmeans(df_scale, centers = 6, nstart = 30)
+# c7 <- kmeans(df_scale, centers = 7, nstart = 30)
+# c8 <- kmeans(df_scale, centers = 8, nstart = 30)
+# c9 <- kmeans(df_scale, centers = 9, nstart = 30)
+```
+
+```{r}
+fviz_nbclust(df_scale, kmeans, method = "wss", k.max = 24)
+```
+
+```{r}
+clst <- kmeans(df_scale, centers = 9, nstart = 30)
+fviz_cluster(clst, data = df_scale)
+```
+
+```{r}
+df_group <- df_info %>%
+    inner_join(df_weather_mar1, by = "country") %>%
+    mutate(cluster = clst$cluster) %>%  
+    mutate_at("cluster", as_factor)
+```
+
+```{r}
+ggplot(df_group, aes(x = cluster, y = pop)) +
+    geom_boxplot()
+```
+
+```{r}
+ggplot(df_group, aes(x = cluster, y = density)) +
+    geom_boxplot()
+```
+
+```{r}
+ggplot(df_group, aes(x = cluster, y = medianage)) +
+    geom_boxplot()
+```
+
+```{r}
+ggplot(df_group, aes(x = cluster, y = urbanpop)) +
+    geom_boxplot()
+```
+
+```{r}
+ggplot(df_group, aes(x = cluster, y = hospibed)) +
+    geom_boxplot()
+```
+
+```{r}
+ggplot(df_group, aes(x = cluster, y = temp)) +
+    geom_boxplot()
+```
