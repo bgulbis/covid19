@@ -72,6 +72,15 @@ raw_state %>%
     theme(legend.position = "none")
 ```
 
+```{r, fig.cap="Positive cases by state, excluding NY"}
+raw_state %>%
+    filter(state != "NY") %>%
+    ggplot(aes(x = date, y = positive, color = state)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
 ```{r, fig.cap="Negative tests by state"}
 raw_state %>%
     ggplot(aes(x = date, y = negative, color = state)) +
