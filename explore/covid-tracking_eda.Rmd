@@ -20,111 +20,57 @@ library(themebg)
 raw_state <- read_csv("https://covidtracking.com/api/states/daily.csv") %>%
     mutate_at("date", as.character) %>%
     mutate_at("date", parse_date, format = "%Y%m%d") %>%
-    arrange(date, state)
+    arrange(date, state) %>%
+    mutate(str_date = as.character(date))
 
 raw_state_info <- read_csv("https://covidtracking.com/api/states/info.csv")
 
+df_state_info <- raw_state_info %>%
+    select(state, name)
+
 raw_usa <- read_csv("https://covidtracking.com/api/us/daily.csv") %>%
     mutate_at("date", as.character) %>%
-    mutate_at("date", parse_date, format = "%Y%m%d") 
+    mutate_at("date", parse_date, format = "%Y%m%d")  %>%
+    mutate(str_date = as.character(date))
 
-```
+raw_lockdown <- read_csv(
+    "../data/raw/kaggle_jcyzag/countryLockdowndates.csv",
+    skip = 1,
+    col_names = c("country", "name", "lockdown_date", "lockdown", "reference")
+) %>%
+    mutate_at("lockdown_date", parse_date, format = "%d/%m/%Y")
 
-# USA
+df_state_lockdown <- raw_lockdown %>%
+    select(name, lockdown_date, lockdown)
 
-```{r, fig.cap="Positive cases in USA"}
-raw_usa %>%
-    ggplot(aes(x = date, y = positive)) +
-    geom_line() +
-    theme_bg() +
-    theme(legend.position = "none")
-```
+df_usa <- raw_usa %>%
+    arrange(date) %>%
+    mutate(
+        death_positive = death / positive,
+        death_hospital = death / hospitalized,
+        death_icu = death / inIcuCumulative,
+        death_vent = death / onVentilatorCumulative,
+        hospital_positive = hospitalized / positive,
+        pos_inc_chg = positiveIncrease - lag(positiveIncrease),
+        death_inc_chg = deathIncrease - lag(deathIncrease),
+        pos_inc_chg_pct = (pos_inc_chg / positiveIncrease) * 100,
+        death_inc_chg_pct = (death_inc_chg / deathIncrease) * 100
+    ) 
 
-```{r, fig.cap="Number of of new positive cases each day in USA"}
-raw_usa %>%
-    ggplot(aes(x = date, y = positiveIncrease)) +
-    geom_line() +
-    theme_bg()
-```
+df_state <- raw_state %>%
+    group_by(state, date) %>%
+    mutate(
+        death_positive = death / positive,
+        death_hospital = death / hospitalized,
+        death_icu = death / inIcuCumulative,
+        death_vent = death / onVentilatorCumulative,
+        hospital_positive = hospitalized / positive
+    ) %>%
+    ungroup() %>%
+    left_join(df_state_info, by = "state") %>%
+    left_join(df_state_lockdown, by = "name") %>%
+    mutate_at("lockdown", as_factor)
 
-```{r, fig.cap="Cummulative deaths in USA"}
-raw_usa %>%
-    ggplot(aes(x = date, y = death)) +
-    geom_line() +
-    theme_bg() +
-    theme(legend.position = "none")
-```
-
-```{r, fig.cap="Number of new deaths each day in USA"}
-raw_usa %>%
-    ggplot(aes(x = date, y = deathIncrease)) +
-    geom_line() +
-    theme_bg()
-```
-
-# State
-
-```{r, fig.cap="Positive cases by state"}
-raw_state %>%
-    ggplot(aes(x = date, y = positive, color = state)) +
-    geom_line() +
-    theme_bg() +
-    theme(legend.position = "none")
-```
-
-```{r, fig.cap="Positive cases by state, excluding NY"}
-raw_state %>%
-    filter(state != "NY") %>%
-    ggplot(aes(x = date, y = positive, color = state)) +
-    geom_line() +
-    theme_bg() +
-    theme(legend.position = "none")
-```
-
-```{r, fig.cap="Negative tests by state"}
-raw_state %>%
-    ggplot(aes(x = date, y = negative, color = state)) +
-    geom_line() +
-    theme_bg() +
-    theme(legend.position = "none")
-```
-
-```{r, fig.cap="Total number of tests by state"}
-raw_state %>%
-    ggplot(aes(x = date, y = totalTestResults, color = state)) +
-    geom_line() +
-    theme_bg() +
-    theme(legend.position = "none")
-```
-
-```{r, fig.cap="Number of deaths by state"}
-raw_state %>%
-    filter(!is.na(death)) %>%
-    ggplot(aes(x = date, y = death, color = state)) +
-    geom_line() +
-    theme_bg() +
-    theme(legend.position = "none")
-```
-
-```{r, fig.cap="Number of new positive cases each day by state"}
-raw_state %>%
-    ggplot(aes(x = date, y = positiveIncrease, color = state)) +
-    geom_line() +
-    theme_bg() +
-    theme(legend.position = "none")
-```
-
-```{r, fig.cap="Number of new deaths each day by state"}
-raw_state %>%
-    ggplot(aes(x = date, y = deathIncrease, color = state)) +
-    geom_line() +
-    theme_bg() +
-    theme(legend.position = "none")
-```
-
-# NY vs. Rest of USA
-
-```{r}
 df_us_ny <- raw_state %>%
     mutate(is_ny = state == "NY") %>%
     group_by(date, is_ny) %>%
@@ -138,7 +84,210 @@ df_us_ny <- raw_state %>%
         tests_change = tests - lag(tests),
         death_positive = death / positive
     )
+
+
 ```
+
+# USA
+
+```{r}
+library(plotly)
+```
+
+```{r, fig.cap="Positive cases in USA"}
+# raw_usa %>%
+#     ggplot(aes(x = date, y = positive)) +
+#     geom_line() +
+#     theme_bg() +
+#     theme(legend.position = "none")
+
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~positive) %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Number of of new positive cases each day in USA"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~positiveIncrease) %>%
+    # add_lines() %>%
+    add_bars() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Rate of change of new positive cases each day"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~pos_inc_chg) %>%
+    add_lines() %>%
+    # add_bars() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Rate of change of new positive cases each day as percent of new positive cases"}
+l <- lm(pos_inc_chg_pct ~ date, df_usa)
+
+df_usa %>%
+    filter(!is.na(pos_inc_chg_pct)) %>%
+    plot_ly(x = ~str_date) %>%
+    add_lines(y = ~pos_inc_chg_pct) %>%
+    add_lines(y = fitted(l)) %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Cummulative deaths in USA"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~death) %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Number of new deaths each day in USA"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~deathIncrease) %>%
+    add_bars() %>%
+    layout(showlegend = FALSE)
+```
+
+
+```{r, fig.cap="Rate of change of new deaths each day"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~death_inc_chg) %>%
+    add_lines() %>%
+    # add_bars() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Rate of change of new deaths each day as percent of new deaths"}
+l <- lm(death_inc_chg_pct ~ date, df_usa)
+
+df_usa %>%
+    filter(!is.na(death_inc_chg_pct)) %>%
+    plot_ly(x = ~str_date) %>%
+    add_lines(y = ~death_inc_chg_pct) %>%
+    add_lines(y = fitted(l)) %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Deaths per positive cases"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~death_positive) %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Cummulative hospitalizations"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~hospitalized) %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Number of new hospitalizations each day"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~hospitalizedIncrease) %>%
+    add_bars() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Hospitalizations per positive cases"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~hospital_positive) %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Deaths per hospitalized cases"}
+df_usa %>%
+    plot_ly(x = ~str_date, y = ~death_hospital) %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+# State
+
+```{r, fig.cap="Positive cases by state"}
+df_state %>%
+    plot_ly(x = ~str_date, y = ~positive, color = ~state, colors = "Paired") %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Positive cases by state, excluding NY", eval=FALSE}
+df_state %>%
+    filter(state != "NY") %>%
+    ggplot(aes(x = date, y = positive, color = state)) +
+    geom_line() +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+```{r, fig.cap="Number of new positive cases each day by state"}
+df_state %>%
+    plot_ly(x = ~str_date, y = ~positiveIncrease, color = ~state, colors = "Paired") %>%
+    add_bars() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Number of deaths by state"}
+df_state %>%
+    plot_ly(x = ~str_date, y = ~death, color = ~state, colors = "Paired") %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Number of new deaths each day by state"}
+df_state %>%
+    plot_ly(x = ~str_date, y = ~deathIncrease, color = ~state, colors = "Paired") %>%
+    add_bars() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Deaths per positive cases by state"}
+df_state %>%
+    plot_ly(x = ~str_date, y = ~death_positive, color = ~state, colors = "Paired") %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Number of hospitalizations by state"}
+df_state %>%
+    plot_ly(x = ~str_date, y = ~hospitalized, color = ~state, colors = "Paired") %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Number of new hospitalizations each day by state"}
+df_state %>%
+    plot_ly(x = ~str_date, y = ~hospitalizedIncrease, color = ~state, colors = "Paired") %>%
+    add_bars() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Hospitalizations per positive case by state"}
+df_state %>%
+    plot_ly(x = ~str_date, y = ~hospital_positive, color = ~state, colors = "Paired") %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Deaths per hospitalized case by state"}
+df_state %>%
+    plot_ly(x = ~str_date, y = ~death_hospital, color = ~state, colors = "Paired") %>%
+    add_lines() %>%
+    layout(showlegend = FALSE)
+```
+
+```{r, fig.cap="Increase in daily cases after lockdown by state", fig.width=8, fig.height=8}
+df_state %>%
+    ggplot(aes(x = date, y = positiveIncrease)) +
+    geom_col() +
+    geom_vline(aes(xintercept = lockdown_date, linetype = lockdown)) +
+    facet_wrap(~ state, scales = "free_y") +
+    theme_bg() +
+    theme(legend.position = "none")
+```
+
+# NY vs. Rest of USA
 
 ```{r, fig.cap="Number of positive cases in NY vs. rest of USA"}
 df_us_ny %>%
