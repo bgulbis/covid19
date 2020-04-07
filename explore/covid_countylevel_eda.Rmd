@@ -1,0 +1,77 @@
+---
+title: "US County Data"
+author: "Brian Gulbis, PharmD, BCPS"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+    html_document:
+        code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+Data source: https://github.com/JieYingWu/COVID-19_US_County-level_Summaries
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(themebg)
+
+df_counties <- read_csv("../data/raw/covid19-us-countylevel-summaries/counties.csv")
+
+df_grocery <- read_csv("../data/raw/covid19-us-countylevel-summaries/grocery_visits.csv") %>%
+    pivot_longer(cols = -FIPS, names_to = "date") %>%
+    mutate_at("date", as_date, format = "%m / %d / %Y", tz = "UTC")
+
+df_healthcare <- read_csv("../data/raw/covid19-us-countylevel-summaries/healthcare_visits.csv") %>%
+    pivot_longer(cols = -FIPS, names_to = "date") %>%
+    mutate_at("date", as_date, format = "%m / %d / %Y", tz = "UTC")
+
+df_hospital <- read_csv("../data/raw/covid19-us-countylevel-summaries/hospital_visits.csv") %>%
+    pivot_longer(cols = -FIPS, names_to = "date") %>%
+    mutate_at("date", as_date, format = "%m / %d / %Y", tz = "UTC")
+
+df_poi <- read_csv("../data/raw/covid19-us-countylevel-summaries/poi_visits.csv") %>%
+    pivot_longer(cols = -FIPS, names_to = "date") %>%
+    mutate_at("date", as_date, format = "%m / %d / %Y", tz = "UTC")
+
+```
+
+```{r}
+df_grocery %>%
+    group_by(date) %>%
+    summarize_at("value", sum, na.rm = TRUE) %>%
+    ggplot(aes(x = date, y = value)) +
+    geom_line() +
+    theme_bg()
+```
+
+```{r}
+df_healthcare %>%
+    group_by(date) %>%
+    summarize_at("value", sum, na.rm = TRUE) %>%
+    ggplot(aes(x = date, y = value)) +
+    geom_line() +
+    theme_bg()
+```
+
+```{r}
+df_hospital %>%
+    group_by(date) %>%
+    summarize_at("value", sum, na.rm = TRUE) %>%
+    ggplot(aes(x = date, y = value)) +
+    geom_line() +
+    theme_bg()
+```
+
+```{r}
+df_poi %>%
+    group_by(date) %>%
+    summarize_at("value", sum, na.rm = TRUE) %>%
+    ggplot(aes(x = date, y = value)) +
+    geom_line() +
+    theme_bg()
+```
+
+
